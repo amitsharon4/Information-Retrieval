@@ -10,30 +10,33 @@ from collections import Counter
 
 nltk.download('stopwords')
 nltk.download('punkt')
-stop_words = stopwords.words('english') + ['.', "'"]
 dictionary = set()
 df = {}
 tf = {}
 weights = {}
 docs = []
+docs_length = {}
 
 
 def count_words_in_record(record):
     ps = PorterStemmer()
+    stop_words = stopwords.words('english') + ['.', "'"]
+    record_num = record.findNext('RECORDNUM').text
     title = record.findNext('TITLE').text
     summary = record.findNext('ABSTRACT').text if record.findNext('ABSTRACT') is not None else record. \
         findNext('EXTRACT').text
-    word_tokens = [ps.stem(w) for w in word_tokenize(title) + word_tokenize(summary)]
+    stemmed_words = [ps.stem(w) for w in word_tokenize(title) + word_tokenize(summary)]
+    docs_length[record_num] = len(stemmed_words)
+    word_tokens = [w for w in stemmed_words if w not in stop_words]
     dictionary.update(word_tokens)
     counts = Counter([w for w in word_tokens if not w.lower() in stop_words])
-    return counts
+    return counts, record_num
 
 
 def process_record(record):
     global docs
     global dictionary
-    record_num = record.findNext('RECORDNUM').text
-    word_counts = count_words_in_record(record)
+    word_counts, record_num = count_words_in_record(record)
     max_occurrences = max(word_counts.values())
     docs.append(record_num)
     for word in word_counts:
