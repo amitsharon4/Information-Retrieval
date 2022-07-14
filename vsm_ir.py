@@ -7,15 +7,17 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import PorterStemmer
 from collections import Counter
+from collections import OrderedDict
 
 nltk.download('stopwords')
 nltk.download('punkt')
-dictionary = set()
+dictionary = OrderedDict()
 df = {}
 tf = {}
 weights = {}
 docs = []
 docs_length = {}
+vsm = {}
 
 
 def count_words_in_record(record):
@@ -28,7 +30,11 @@ def count_words_in_record(record):
     stemmed_words = [ps.stem(w) for w in word_tokenize(title) + word_tokenize(summary)]
     docs_length[record_num] = len(stemmed_words)
     word_tokens = [w for w in stemmed_words if w not in stop_words]
-    dictionary.update(word_tokens)
+    for w in word_tokens:
+        if w not in dictionary:
+            dictionary[w] = set(record_num)
+        else:
+            dictionary[w].add(record_num)
     counts = Counter([w for w in word_tokens if not w.lower() in stop_words])
     return counts, record_num
 
@@ -72,13 +78,18 @@ def get_weights(idf):
 
 
 def create_index(directory):
+    global weights
     for file_name in os.listdir(directory):
         if file_name.endswith(".xml"):
             file = open(directory + '/' + file_name, 'r')
             get_tf_df(file)
             file.close()
     idf = get_idf(len(docs))
-    return get_weights(idf)
+    weights = get_weights(idf)
+    for doc in docs:
+        vsm[doc] = []
+        for word in dictionary:
+            vsm[doc].append(weights[(doc, word)])
 
 
 create_index("/Users/amitsharon/Documents/GitHub/Information-Retrieval")
