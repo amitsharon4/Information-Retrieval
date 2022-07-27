@@ -83,7 +83,7 @@ def get_weights(idf):
 
 
 def create_index(directory):
-    global weights
+    global weights, docs_length, appearances, tf
     for file_name in os.listdir(directory):
         if file_name.endswith(".xml"):
             file = open(directory + '/' + file_name, 'r')
@@ -118,13 +118,14 @@ def create_index(directory):
                 file.write("\t\t\t\ttf: " + str(tf[doc, word]) + ",\n")
                 file.write("\t\t\t\ttf_idf: " + str(weights[doc, word]) + "\n")
                 closed = False
-                docs_left -= 1
         file.write("\t\t\t}\n")
         if words_left == 1:
             file.write("\t\t}\n")
         else:
             file.write("\t\t},\n")
         words_left -= 1
+    file.write("\t},\n")
+    file.write("\taverage document length: " + str(sum(docs_length.values())/len(docs_length)) + '\n')
     file.write("\t}\n")
     file.write("}\n")
 
