@@ -8,10 +8,12 @@ from nltk.tokenize import word_tokenize
 from nltk.stem import PorterStemmer
 from collections import Counter
 from collections import OrderedDict
+from numpy.linalg import norm
 
 nltk.download('stopwords')
 nltk.download('punkt')
 dictionary = OrderedDict()
+appearances = {}
 df = {}
 tf = {}
 weights = {}
@@ -21,9 +23,10 @@ vsm = {}
 
 
 def count_words_in_record(record):
+    global appearances
     ps = PorterStemmer()
     stop_words = stopwords.words('english') + ['.', "'"]
-    record_num = record.findNext('RECORDNUM').text
+    record_num = record.findNext('RECORDNUM').text.lstrip('0')
     title = record.findNext('TITLE').text
     summary = record.findNext('ABSTRACT').text if record.findNext('ABSTRACT') is not None else record. \
         findNext('EXTRACT').text
@@ -36,6 +39,8 @@ def count_words_in_record(record):
         else:
             dictionary[w].add(record_num)
     counts = Counter([w for w in word_tokens if not w.lower() in stop_words])
+    for word in counts:
+        appearances[(record_num, word)] = counts[word]
     return counts, record_num
 
 
@@ -86,11 +91,42 @@ def create_index(directory):
             file.close()
     idf = get_idf(len(docs))
     weights = get_weights(idf)
+    file = open(directory + "/vsm_inverted_index.json", "w")
+    file.write("{\n\tdocs_dict: {\n")
+    docs_left = len(docs)
     for doc in docs:
-        vsm[doc] = []
-        for word in dictionary:
-            vsm[doc].append(weights[(doc, word)])
+        file.write("\t\t" + str(doc) + ": {\n")
+        file.write("\t\t\tlength: " + str(docs_length[doc]) + ",\n")
+        file.write("\t\t\tnorm: " + str(norm([weights[(doc, word)] for word in dictionary])) + '\n')
+        if docs_left == 1:
+            file.write("\t\t}\n")
+        else:
+            file.write("\t\t},\n")
+        docs_left -= 1
+    file.write("\t},\n")
+    file.write("\twords_dict: {\n")
+    words_left = len(dictionary)
+    for word in dictionary:
+        file.write("\t\t" + word + ": {\n")
+        closed = True
+        for doc in docs:
+            if (doc, word) in appearances:
+                if not closed:
+                    file.write("\t\t\t},\n")
+                file.write("\t\t\t" + str(doc) + ": {\n")
+                file.write("\t\t\t\tcount: " + str(appearances[(doc, word)]) + ",\n")
+                file.write("\t\t\t\ttf: " + str(tf[doc, word]) + ",\n")
+                file.write("\t\t\t\ttf_idf: " + str(weights[doc, word]) + "\n")
+                closed = False
+                docs_left -= 1
+        file.write("\t\t\t}\n")
+        if words_left == 1:
+            file.write("\t\t}\n")
+        else:
+            file.write("\t\t},\n")
+        words_left -= 1
+    file.write("\t}\n")
+    file.write("}\n")
 
 
 create_index("/Users/amitsharon/Documents/GitHub/Information-Retrieval")
-print("breakpoint")
