@@ -1,5 +1,4 @@
 import math
-
 from bs4 import BeautifulSoup
 import nltk
 import os
@@ -10,8 +9,8 @@ from collections import Counter
 from collections import OrderedDict
 from numpy.linalg import norm
 
-nltk.download('stopwords')
-nltk.download('punkt')
+nltk.download('stopwords', quiet=True)
+nltk.download('punkt', quiet=True)
 dictionary = OrderedDict()
 appearances = {}
 df = {}
@@ -26,13 +25,13 @@ def count_words_in_record(record):
     global appearances
     ps = PorterStemmer()
     stop_words = stopwords.words('english') + ['.', "'"]
-    record_num = record.findNext('RECORDNUM').text.lstrip('0')
+    record_num = record.findNext('RECORDNUM').text.lstrip('0').strip()
     title = record.findNext('TITLE').text
     summary = record.findNext('ABSTRACT').text if record.findNext('ABSTRACT') is not None else record. \
         findNext('EXTRACT').text
     stemmed_words = [ps.stem(w) for w in word_tokenize(title) + word_tokenize(summary)]
-    docs_length[record_num] = len(stemmed_words)
     word_tokens = [w for w in stemmed_words if w not in stop_words]
+    docs_length[record_num] = len(word_tokens)
     for w in word_tokens:
         if w not in dictionary:
             dictionary[w] = set(record_num)
