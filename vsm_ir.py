@@ -25,7 +25,6 @@ else:
 nltk.download('stopwords', quiet=True)
 nltk.download('punkt', quiet=True)
 dictionary = OrderedDict()
-appearances = {}
 df = {}
 tf = {}
 weights = {}
@@ -43,15 +42,16 @@ def isfloat(num):
 
 
 def count_words_in_record(record):
-    global appearances
     ps = PorterStemmer()
-    stop_words = stopwords.words('english') + ['.', "'", ".", "?", "!", "[", "]", "(", ")"]
+    stop_words = stopwords.words('english') + ['.', "'", ".", "?", "!", "[", "]", "(", ")", ":"]
     record_num = record.findNext('RECORDNUM').text.lstrip('0').strip()
     title = record.findNext('TITLE').text
+    major_subject = ' '.join([x.text for x in record.findNext('MAJORSUBJ').contents])
+    minor_subject = ' '.join([x.text for x in record.findNext('MINORSUBJ').contents])
     summary = record.findNext('ABSTRACT').text if record.findNext('ABSTRACT') is not None else record. \
         findNext('EXTRACT').text
     screened_words = []
-    for w in word_tokenize(title) + word_tokenize(summary):
+    for w in word_tokenize(title) + word_tokenize(summary) + word_tokenize(major_subject) + word_tokenize(minor_subject):
         if '-' in w:
             screened_words + w.split('-')
         else:
@@ -59,14 +59,20 @@ def count_words_in_record(record):
     stemmed_words = [ps.stem(w) for w in screened_words if not isfloat(w)]
     word_tokens = [w.strip('-') for w in stemmed_words if w not in stop_words]
     docs_length[record_num] = len(word_tokens)
+    screened_words = []
+    for w in word_tokenize(title) * 3 + word_tokenize(major_subject) * 2 + word_tokenize(minor_subject):
+        if '-' in w:
+            screened_words + w.split('-')
+        else:
+            screened_words.append(w)
+    stemmed_words = [ps.stem(w) for w in screened_words if not isfloat(w)]
+    word_tokens = word_tokens + [w.strip('-') for w in stemmed_words if w not in stop_words]
     for w in word_tokens:
         if w not in dictionary:
             dictionary[w] = set(record_num)
         else:
             dictionary[w].add(record_num)
     counts = Counter([w for w in word_tokens if not w.lower() in stop_words])
-    for word in counts:
-        appearances[(record_num, word)] = counts[word]
     return counts, record_num
 
 
@@ -111,7 +117,7 @@ def get_weights(idf):
 def create_index(directory):
     json_data = {}
     docs_dict = {}
-    global weights, docs_length, appearances, tf
+    global weights, docs_length, tf
     for file_name in os.listdir(directory):
         if file_name.endswith(".xml"):
             file = open(directory + '/' + file_name, 'r')
@@ -127,9 +133,8 @@ def create_index(directory):
     words_dict = {word: {} for word in dictionary}
     for word in dictionary:
         for doc in docs:
-            if (doc, word) in appearances:
+            if (doc, word) in tf:
                 words_dict[word][doc] = {
-                    "count": appearances[(doc, word)],
                     "tf": tf[(doc, word)],
                     "tf_idf": weights[(doc, word)]
                 }
@@ -164,11 +169,9 @@ def bm25(fixed_query, docs_dict, words_dict, avgdl, N):
         res = calc_sum_bm25(idf_query, tf_doc_query, for_cal, k1_1)
         # print(res)
         # exit()
-
         if res > 0.055:
             dict_res[doc] = res
         sorted_dict = {k: v for k, v in sorted(dict_res.items(), key=lambda item: item[1], reverse=True)}
-
     return sorted_dict
 
 
