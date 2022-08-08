@@ -1,4 +1,5 @@
 import math
+import ssl
 from bs4 import BeautifulSoup
 import nltk
 import os
@@ -15,6 +16,12 @@ import json
 # PART 1
 # create inverted index
 
+try:
+    _create_unverified_https_context = ssl._create_unverified_context
+except AttributeError:
+    pass
+else:
+    ssl._create_default_https_context = _create_unverified_https_context
 nltk.download('stopwords', quiet=True)
 nltk.download('punkt', quiet=True)
 dictionary = OrderedDict()
@@ -142,21 +149,21 @@ def create_index(directory):
 # BM25
 def bm25(fixed_query, docs_dict, words_dict, avgdl, N):
     dict_res = {}
-    b = 0.75
-    k1 = 1.2
+    b = 0
+    k1 = 1.7
     idf_query = idf_bm25_query(fixed_query, N, words_dict)
-    print(idf_query)
+    # print(idf_query)
     for doc in docs_dict.keys():
         D = int(docs_dict[doc]["length"])  # doc length
-        print(D)
+        # print(D)
         tf_doc_query = tf_bm25(doc, fixed_query, words_dict)
-        print(tf_doc_query)
+        # print(tf_doc_query)
         for_cal = (1 - b + b * (D / avgdl)) * k1
-        print(for_cal)
+        # print(for_cal)
         k1_1 = k1 + 1
         res = calc_sum_bm25(idf_query, tf_doc_query, for_cal, k1_1)
-        print(res)
-        exit()
+        # print(res)
+        # exit()
 
         if res > 0.055:
             dict_res[doc] = res
@@ -184,12 +191,12 @@ def tf_bm25(doc, query, words_dict):
 
 
 def idf_bm25_query(fixed_query, N, words_dict):
-    print(N)
+    # print(N)
     idf_query = []
     for q_i in fixed_query:
         if words_dict.get(q_i) != None:
             n_qi = len(words_dict.get(q_i))
-            print(n_qi)
+            # print(n_qi)
         else:
             n_qi = 0
         idf_qi = math.log(1 + (N - n_qi + 0.5) / (n_qi + 0.5))
@@ -207,7 +214,7 @@ def tfidf_query(query_dict, words_dict, N, doc):  # create vector for query
     for key in query_dict.keys():  # normal tf + calc tf*idf
         val = query_dict[key]
         if words_dict.get(key) != None and words_dict.get(key).get(doc) != None:
-            print(len(words_dict.get(key)))
+            # print(len(words_dict.get(key)))
             idf = math.log2(N / len(words_dict.get(key)))
         else:
             idf1 = math.log2(N / 1)
@@ -216,7 +223,7 @@ def tfidf_query(query_dict, words_dict, N, doc):  # create vector for query
         # dict_res[key] = (val/max_val_query)*idf
         res.append((val / max_val_query) * idf)
         v_norm.append((val / max_val_query) * idf)
-    print(v_norm)
+    # print(v_norm)
     res_norm = norm(v_norm)
     return res, res_norm
 
@@ -238,7 +245,7 @@ def tfidf_doc(query_dict, words_dict, doc):  # create relevant vector for doc
 def tfidf(fixed_query, docs_dict, words_dict, N):
     dict_res = {}
     query_dict = dict(Counter(fixed_query))  # dict of num of appearance of word in dict
-    print(query_dict)
+    # print(query_dict)
 
     for doc in docs_dict.keys():
         # print("doc num "+str(doc))
@@ -258,9 +265,15 @@ def process_query(question):
     q = question.lower()
     ps = PorterStemmer()
     stop_words = stopwords.words('english') + ['.', "'", ".", "?", "!", "[", "]", "(", ")"]
-    stemmed_words = [ps.stem(w) for w in word_tokenize(q)]
-    word_tokens = [w for w in stemmed_words if w not in stop_words]
-    print(word_tokens)
+    screened_words = []
+    for w in word_tokenize(q):
+        if '-' in w:
+            screened_words + w.split('-')
+        else:
+            screened_words.append(w)
+    stemmed_words = [ps.stem(w) for w in screened_words if not isfloat(w)]
+    word_tokens = [w.strip('-') for w in stemmed_words if w not in stop_words]
+    # print(word_tokens)
     return word_tokens
 
 
@@ -285,24 +298,25 @@ def query(ranking, question, index_path):
         print("Worng argument for ranking")
         exit()
     res = open("ranked_query_docs.txt", "w")
-    print(relevant_doc)
+    # print(relevant_doc)
     max_val = relevant_doc[max(relevant_doc, key=relevant_doc.get)]
-    print("\n\n")
-    print(max_val)
-    print("\n\n")
+    # print("\n\n")
+    ##print(max_val)
+    # print("\n\n")
     for doc in relevant_doc.keys():
         res.write(doc + "\n")
     res.close()
 
 
+""""
 # Main
-"""
 def main(mode, path, ranking, question):
     if mode == "create_index":
         create_index(path)
     if mode == "query":
         query(ranking,question,path)
-"""
+"""""
+
 # Main
 if len(sys.argv) == 1:
     print("Wrong number of arguments")
